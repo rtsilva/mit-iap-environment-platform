@@ -741,4 +741,44 @@ service adminService on endPoint {
 
         error? respond = caller->respond(response);
     }
+
+    @http:ResourceConfig {
+        methods: ["GET"],
+        path: "/get-assigned-requests/{userName}"
+    }
+    resource function getAssignedRequests(http:Caller caller, http:Request request, string userName) returns @untainted error? {
+
+        // http:Request request = new;
+        http:Response response = new;
+        string url = "/repos/" + ORGANIZATION_NAME + "/" + REPOSITORY_NAME + "/issues?state=all";
+
+        // request.addHeader("Authorization", ACCESS_TOKEN);
+        // http:Response | error githubResponse = githubAPIEndpoint->get(<@untained>url, request);
+        http:Response | error githubResponse = githubAPIEndpoint->get(url);
+
+        if (githubResponse is http:Response) {
+            var jsonPayload = githubResponse.getJsonPayload();
+            if (jsonPayload is json[]) {
+                json | error issues = utilities:extractIssuesRelatedToUser(jsonPayload, userName);
+                if (issues is json) {
+                    response.statusCode = http:STATUS_OK;
+                    response.setJsonPayload(<@untained>issues);
+                } else {
+                    log:printInfo("The issues related to user could not be converted to json.");
+                    response.statusCode = http:STATUS_INTERNAL_SERVER_ERROR;
+                    response.setPayload(<@untained>issues.reason());
+                }
+            } else {
+                log:printInfo("Invalid json payload received from the response obtained from github.");
+                response.statusCode = http:STATUS_INTERNAL_SERVER_ERROR;
+                response.setPayload("Invalid json payload received from github response.");
+            }
+        } else {
+            log:printInfo("The github response is not in the expected form: http:Response.");
+            response.statusCode = http:STATUS_NOT_ACCEPTABLE;
+            response.setPayload(<@untained>githubResponse.reason());
+        }
+
+        error? respond = caller->respond(response);
+    }
 }
