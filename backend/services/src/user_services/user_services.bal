@@ -372,4 +372,59 @@ service userService on endPoint {
         }
         error? respond = caller->respond(response);
     }
+
+
+    @http:ResourceConfig {
+        methods: ["GET"],
+        path: "/get-comments/{issueNumber}/{userName}"
+    }
+    resource function getCommentsOnIssueByUser(http:Caller caller, http:Request request, string issueNumber, string userName) returns @untainted error? {
+
+        http:Response response = new;
+        string url = "/repos/" + ORGANIZATION_NAME + "/" + REPOSITORY_NAME + "/" + issueNumber + "/comments";
+
+        http:Response | error githubResponse = githubAPIEndpoint->get(<@untained>url);
+
+        boolean | error validUser = utilities:isValidUserOnIssue(<@untainted>userName, <@untainted>issueNumber);
+        boolean | error validIssue = utilities:isValidIssue(<@untainted>issueNumber);
+
+        if (validIssue is boolean) {
+            if (validUser is boolean) {
+                if (githubResponse is http:Response) {
+                    var jsonPayload = githubResponse.getJsonPayload();
+                    if (jsonPayload is json[]) {
+                        json[] | error comments = utilities:createFormattedComments(jsonPayload);
+                        if (comments is json[]) {
+                            response.statusCode = http:STATUS_OK;
+                            response.setJsonPayload(<@untained>comments);
+                        } else {
+                            log:printInfo("The comments related to issue could not be converted to json.");
+                            response.statusCode = http:STATUS_INTERNAL_SERVER_ERROR;
+                            response.setPayload(<@untained>comments.reason());
+                        }
+                    } else {
+                        log:printInfo("Invalid json payload received from the response obtained from github.");
+                        response.statusCode = http:STATUS_INTERNAL_SERVER_ERROR;
+                        response.setPayload("Invalid payload received from github response.");
+                    }
+                } else {
+                    log:printInfo("The github response is not in the expected form: http:Response.");
+                    response.statusCode = http:STATUS_INTERNAL_SERVER_ERROR;
+                    response.setPayload(<@untained>githubResponse.reason());
+                }
+            } else {
+                log:printInfo("Error occurred while checking the validity of the user");
+                response.statusCode = http:STATUS_NOT_ACCEPTABLE;
+                response.setPayload(validUser.reason());
+            }
+        } else {
+            log:printInfo("Error occurred while checking the validity of the issue");
+            response.statusCode = http:STATUS_NOT_ACCEPTABLE;
+            response.setPayload(validIssue.reason());
+        }
+        error? respond = caller->respond(response);
+           
+    }
+
+
 }
