@@ -3,6 +3,8 @@ import ballerina/http;
 import ballerina/lang.'int as ints;
 import ballerina/log;
 
+
+
 http:Client githubAPIEndpoint = new (GITHUB_API_URL);
 
 listener http:Listener endPoint = new (USER_SERVICES_PORT);
@@ -15,6 +17,7 @@ listener http:Listener endPoint = new (USER_SERVICES_PORT);
 }
 
 service userService on endPoint {
+
 
     @http:ResourceConfig {
         methods: ["GET"],
@@ -79,7 +82,7 @@ service userService on endPoint {
         if (githubResponse is http:Response) {
             var jsonPayload = githubResponse.getJsonPayload();
             if (jsonPayload is json[]) {
-                json | error issues = utilities:extractIssuesRelatedToUser(jsonPayload, userName);
+                json | error issues = utilities:findIssuesRelatedToUser(jsonPayload, userName);
                 if (issues is json) {
                     response.statusCode = http:STATUS_OK;
                     response.setJsonPayload(<@untained>issues);
@@ -122,7 +125,7 @@ service userService on endPoint {
                 callBackRequest.setPayload(<@untained>({"title": payloadTitle, "body": stringPayloadBody}));
                 http:Response | error githubResponse = githubAPIEndpoint->post(url, callBackRequest);
                 if (githubResponse is http:Response && githubResponse.statusCode == 201) {
-                    string[] createLabelResult = utilities:createLabel(<@untained>userName, "Name of the user.");
+                    string[] createLabelResult = utilities:createLabel(<@untained>userName, "userName");
                     int | error createLabelResultCode = ints:fromString(createLabelResult[0]);
                     if (createLabelResultCode is int && createLabelResultCode == 201) {
                         json | error githubResponsePayload = githubResponse.getJsonPayload();

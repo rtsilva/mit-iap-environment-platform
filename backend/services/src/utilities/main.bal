@@ -207,6 +207,47 @@ public function extractIssuesRelatedToUser(json[] listOfIssues, string userName)
 
 }
 
+# The `findIssuesRelatedToUser` function extracts all the issues related to a specific user.
+# The difference from 'extractIssuesRelatedToUser' is in the output format.
+# + listOfIssues - All the issues related to a specific repsitory. 
+# + userName     - Username of the user. 
+# + return       - Returns a formatted **json[]** of issues related to the user, **error** 
+#                  if a formatted json array of issues cannot be rebuilt or the length of
+#                  the json array length is zero.
+public function findIssuesRelatedToUser(json[] listOfIssues, string userName) returns json | error {
+
+    json[] issues = [];
+    string currentState;
+    foreach json issue in listOfIssues {
+        map<json> issueRecord = <map<json>>issue;
+        json labelDetails = check createAFormattedJsonOfLabels(<json[]>issueRecord.labels);
+        foreach json label in <json[]>labelDetails {
+            map<json> labelRecord = <map<json>>label;
+            if (labelRecord.labelDescription.toString() == "state") {
+                currentState = labelRecord.labelName.toString();
+            } else {
+                currentState = "pending";
+            }
+        }
+        if (userNameExists(<json[]>labelDetails, userName)) {
+            json issueInfo = {
+                "requestTitle":check issueRecord.title,
+                "requestNumber":check issueRecord.number,
+                "requestDetails":check issueRecord.body,
+                "state":currentState
+            };
+            issues[issues.length()] = issueInfo;
+        }
+    }
+
+    if (issues.length() > 0) {
+        return issues;
+    } else {
+        return error("Issues for the specified user cannot be found.");
+    }
+
+}
+
 # The `userNameExists` function checks if the username exists inside the labels of the issue.
 #
 # + labels   - Labels of the issue.
